@@ -3,8 +3,29 @@ import os
 import requests
 import shutil
 from zipfile import ZipFile
+import hashlib
 
-# 🔐 API Keys from secrets or env
+# 🔐 Password protection with SHA256 hash
+def check_password():
+    def password_entered():
+        entered = st.session_state["password"]
+        entered_hash = hashlib.sha256(entered.encode()).hexdigest()
+        if entered_hash == st.secrets["APP_PASSWORD_HASH"]:
+            st.session_state["authenticated"] = True
+        else:
+            st.session_state["authenticated"] = False
+            st.error("❌ Incorrect password")
+
+    if "authenticated" not in st.session_state:
+        st.text_input("Enter password:", type="password", on_change=password_entered, key="password")
+        st.stop()
+    elif not st.session_state["authenticated"]:
+        st.text_input("Enter password:", type="password", on_change=password_entered, key="password")
+        st.stop()
+
+check_password()
+
+# 🔐 API keys from secrets
 FREEPIK_API_KEY = st.secrets["FREEPIK_API_KEY"]
 IMGBB_API_KEY = st.secrets["IMGBB_API_KEY"]
 
@@ -14,7 +35,7 @@ if os.path.exists(output_folder):
     shutil.rmtree(output_folder)
 os.makedirs(output_folder, exist_ok=True)
 
-# 📤 Upload images
+# 📤 Upload interface
 st.title("🪄 Background Remover (Powered by Freepik AI)")
 uploaded_files = st.file_uploader("Upload image(s)", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
 
@@ -25,7 +46,7 @@ if uploaded_files and st.button("✨ Remove Backgrounds"):
             filename = uploaded_file.name
             st.write(f"📷 Processing: {filename}")
 
-            # Save uploaded file
+            # Save locally
             input_path = os.path.join(output_folder, filename)
             with open(input_path, "wb") as f:
                 f.write(uploaded_file.read())
@@ -61,17 +82,17 @@ if uploaded_files and st.button("✨ Remove Backgrounds"):
                 st.warning(f"⚠️ No processed URL returned for {filename}")
                 continue
 
-            # Download the processed image
+            # Download processed image
             output_filename = f"{os.path.splitext(filename)[0]}_processed.png"
             output_path = os.path.join(output_folder, output_filename)
             img_data = requests.get(processed_url).content
             with open(output_path, 'wb') as f:
                 f.write(img_data)
 
-            # Show image
+            # Show preview
             st.image(output_path, caption=f"✅ {output_filename}")
 
-        # Zip the output folder
+        # Zip results
         with ZipFile(zip_path, 'w') as zipf:
             for file in os.listdir(output_folder):
                 zipf.write(os.path.join(output_folder, file), arcname=file)
